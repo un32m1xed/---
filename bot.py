@@ -5,27 +5,13 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 from aiogram import F
-from aiogram.types import Update
-from aiogram.client.session.aiohttp import AiohttpSession
-from aiohttp import web
 import asyncio
 
-# ===== НАСТРОЙКИ (ТВОИ ДАННЫЕ) =====
 TOKEN = "8925937134:AAG_xQQxj2GDUldtCRuR7ie0zGfImA6q6Pk"
 CHANNEL_ID = -1003745006151
 ADMIN_ID = 1584577191
 
-# Прокси (если нужен)
-PROXY = "socks5://185.252.120.34:1080"
-# =================================
-
-# Настройки webhook
-PORT = int(os.environ.get('PORT', 10000))
-WEBHOOK_HOST = "https://png-bot.onrender.com"
-
-# Создаём бота с прокси
-session = AiohttpSession(proxy=PROXY)
-bot = Bot(token=TOKEN, session=session)
+bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
 DB_FILE = "db.json"
@@ -146,50 +132,41 @@ async def start(message: types.Message):
         if expiry >= date.today():
             is_premium = True
     
-    status_text = "⭐ Премиум — безлимит" if is_premium else f"🆓 Бесплатно — {remaining} из {DAILY_FREE_LIMIT} запросов сегодня"
+    status_text = "⭐ Premium - unlimited" if is_premium else f"🆓 Free - {remaining} of {DAILY_FREE_LIMIT} today"
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💎 Купить премиум (30₽)", callback_data="buy_premium")],
-        [InlineKeyboardButton(text="📖 Как пользоваться", callback_data="help")]
+        [InlineKeyboardButton(text="💎 Buy premium (30 RUB)", callback_data="buy_premium")],
+        [InlineKeyboardButton(text="📖 How to use", callback_data="help")]
     ])
     
     await message.answer(
-        f"🐱 Привет, {message.from_user.first_name}!\n\n"
-        f"Я ищу PNG без фона. Напиши слово или фразу.\n\n"
+        f"Hello, {message.from_user.first_name}!\n\n"
+        f"I search PNG without background. Send me a word or phrase.\n\n"
         f"{status_text}\n\n"
-        f"📌 Один запрос = одна картинка. Листай кнопками бесплатно!\n\n"
-        f"⬇️ Напиши свой запрос",
+        f"📌 One request = one image. Browsing is free!\n\n"
+        f"⬇️ Send your request",
         reply_markup=keyboard
     )
 
 @dp.callback_query(lambda c: c.data == "help")
 async def show_help(callback: types.CallbackQuery):
-    await callback.message.answer(
-        "📖 **Инструкция:**\n\n"
-        "1️⃣ Напиши слово или фразу\n"
-        "2️⃣ Получишь первую картинку (снимает 1 запрос)\n"
-        "3️⃣ Кнопки Вперёд/Назад — бесплатно\n\n"
-        "💰 20 запросов бесплатно в день\n"
-        "💎 Премиум — 30₽/месяц, безлимит"
-    )
+    await callback.message.answer("Send a word or phrase. Use Next/Previous buttons.")
     await callback.answer()
 
 @dp.callback_query(lambda c: c.data == "buy_premium")
 async def buy_premium(callback: types.CallbackQuery):
-    await callback.message.answer(
-        "💎 Премиум — 30₽/месяц\n\nСкоро здесь будет автоматическая оплата через ЮKassa.\nПока напиши админу для активации."
-    )
+    await callback.message.answer("Premium will be available soon. 30 RUB/month.")
     await callback.answer()
 
 @dp.message(Command("activate"))
 async def activate_subscription(message: types.Message):
     if message.from_user.id != ADMIN_ID:
-        await message.answer("⛔ Нет прав")
+        await message.answer("No permission")
         return
     
     parts = message.text.split()
     if len(parts) != 2:
-        await message.answer("Использование: /activate USER_ID")
+        await message.answer("Use: /activate USER_ID")
         return
     
     user_id = parts[1]
@@ -201,10 +178,10 @@ async def activate_subscription(message: types.Message):
     users[user_id]["subscription_until"] = expiry_date
     save_users(users)
     
-    await message.answer(f"✅ Подписка активирована для {user_id} до {expiry_date}")
+    await message.answer(f"Subscription activated for {user_id} until {expiry_date}")
     
     try:
-        await bot.send_message(int(user_id), "🎉 Премиум активирован вручную админом.")
+        await bot.send_message(int(user_id), "Premium activated!")
     except:
         pass
 
@@ -216,10 +193,10 @@ async def check_status(message: types.Message):
     if user.get("subscription_until"):
         expiry = datetime.fromisoformat(user["subscription_until"]).date()
         if expiry >= date.today():
-            await message.answer(f"⭐ Премиум до {expiry}")
+            await message.answer(f"Premium until {expiry}")
             return
     
-    await message.answer(f"🆓 Сегодня осталось запросов: {remaining} из {DAILY_FREE_LIMIT}")
+    await message.answer(f"Free: {remaining} requests left today")
 
 @dp.channel_post()
 async def on_channel_post(message: types.Message):
@@ -228,7 +205,7 @@ async def on_channel_post(message: types.Message):
         caption = message.caption or ""
         
         if not caption.strip():
-            await message.reply("⚠️ Ошибка: добавь подпись к файлу")
+            await message.reply("Error: add caption to file")
             return
         
         keyword = caption.strip().lower()
@@ -239,7 +216,7 @@ async def on_channel_post(message: types.Message):
             db[keyword].append(msg_id)
         
         save_db(db)
-        await message.reply(f"✅ Сохранено по запросу: «{keyword}»")
+        await message.reply(f"Saved: {keyword}")
 
 @dp.message(F.text)
 async def search(message: types.Message):
@@ -249,13 +226,13 @@ async def search(message: types.Message):
     can_search, tier = can_user_search(user_id)
     
     if not can_search:
-        await message.answer(f"❌ Лимит {DAILY_FREE_LIMIT} запросов на сегодня исчерпан.")
+        await message.answer(f"Daily limit reached. Buy premium for unlimited access.")
         return
     
     results = search_by_keywords(query)
     
     if not results:
-        await message.answer(f"❌ Ничего не найдено для «{query}»")
+        await message.answer(f"Nothing found for {query}")
         return
     
     increment_search(user_id)
@@ -268,8 +245,8 @@ async def search(message: types.Message):
         "results": results
     }
     
-    limit_text = f"Осталось запросов: {remaining}" if tier == "free" else "Премиум — безлимит"
-    await message.answer(f"🔍 Найдено {len(results)} картинок\n{limit_text}")
+    limit_text = f"Remaining: {remaining}" if tier == "free" else "Premium - unlimited"
+    await message.answer(f"Found {len(results)} images\n{limit_text}")
     await send_image(user_id, message.chat.id)
 
 async def send_image(user_id, chat_id):
@@ -281,11 +258,11 @@ async def send_image(user_id, chat_id):
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="◀️ Назад", callback_data="prev"),
+            InlineKeyboardButton(text="◀️ Back", callback_data="prev"),
             InlineKeyboardButton(text=f"{state['index']+1}/{state['total']}", callback_data="none"),
-            InlineKeyboardButton(text="Вперёд ▶️", callback_data="next")
+            InlineKeyboardButton(text="Next ▶️", callback_data="next")
         ],
-        [InlineKeyboardButton(text="💎 Купить премиум", callback_data="buy_premium")]
+        [InlineKeyboardButton(text="💎 Buy premium", callback_data="buy_premium")]
     ])
     
     try:
@@ -296,7 +273,7 @@ async def send_image(user_id, chat_id):
             reply_markup=keyboard
         )
     except Exception as e:
-        await bot.send_message(chat_id, f"Ошибка: {e}")
+        await bot.send_message(chat_id, f"Error: {e}")
 
 @dp.callback_query()
 async def handle_callback(callback: types.CallbackQuery):
@@ -309,7 +286,7 @@ async def handle_callback(callback: types.CallbackQuery):
     
     state = user_state.get(user_id)
     if not state:
-        await callback.message.answer("🔍 Сначала напиши слово")
+        await callback.message.answer("Send a word first")
         await callback.answer()
         return
     
@@ -326,30 +303,9 @@ async def handle_callback(callback: types.CallbackQuery):
     await send_image(user_id, callback.message.chat.id)
     await callback.answer()
 
-# ЗАПУСК В РЕЖИМЕ WEBHOOK
-async def on_startup():
-    webhook_url = f"{WEBHOOK_HOST}/webhook"
-    await bot.set_webhook(webhook_url)
-    print(f"Webhook установлен на {webhook_url}")
-
-async def handle_webhook(request):
-    update = Update.model_validate(await request.json(), context={"bot": bot})
-    await dp.feed_update(bot, update)
-    return web.Response()
-
 async def main():
-    app = web.Application()
-    app.router.post("/webhook", handle_webhook)
-    
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", PORT)
-    await site.start()
-    
-    await on_startup()
-    print(f"Бот запущен на порту {PORT}")
-    
-    await asyncio.Event().wait()
+    await bot.delete_webhook(drop_pending_updates=True)
+    await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
