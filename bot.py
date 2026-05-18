@@ -5,23 +5,34 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
 from aiogram import F
+from aiogram.types import Update
+from aiogram.client.session.aiohttp import AiohttpSession
+from aiohttp import web
 import asyncio
 import uuid
 import requests
 
-# ===== НАСТРОЙКИ (ЗАМЕНИ НА СВОИ) =====
+# ===== НАСТРОЙКИ (ТВОИ ДАННЫЕ УЖЕ ВСТАВЛЕНЫ) =====
 TOKEN = "8925937134:AAG_xQQxj2GDUldtCRuR7ie0zGfImA6q6Pk"
 CHANNEL_ID = -1003745006151
 ADMIN_ID = 1584577191
 SHOP_ID = ""
 SECRET_KEY = ""
 
+# Прокси (рабочий SOCKS5 прокси, может потребоваться замена)
 PROXY = "socks5://185.252.120.34:1080"
-# ======================================
+# ================================================
 
-bot = Bot(token=TOKEN)
+# --- НАСТРОЙКИ WEBHOOKА (НЕ ТРОГАЙ) ---
+PORT = int(os.environ.get('PORT', 10000))
+WEBHOOK_HOST = f"https://png-bot.onrender.com" # Твой URL на Render
+
+# --- СОЗДАНИЕ БОТА С ПРОКСИ ---
+session = AiohttpSession(proxy=PROXY)
+bot = Bot(token=TOKEN, session=session)
 dp = Dispatcher()
 
+# --- ОСТАЛЬНАЯ ЧАСТЬ ТВОЕГО КОДА (ФУНКЦИИ) ---
 DB_FILE = "db.json"
 USERS_FILE = "users.json"
 
@@ -370,9 +381,34 @@ async def handle_callback(callback: types.CallbackQuery):
     await send_image(user_id, callback.message.chat.id)
     await callback.answer()
 
+# --- НОВАЯ ЧАСТЬ: ЗАПУСК В РЕЖИМЕ WEBHOOK ---
+async def on_startup():
+    """Устанавливает webhook при запуске"""
+    webhook_url = f"{WEBHOOK_HOST}/webhook"
+    await bot.set_webhook(webhook_url)
+    print(f"✅ Webhook установлен на {webhook_url}")
+
+async def handle_webhook(request):
+    """Обрабатывает входящие запросы от Telegram"""
+    update = Update.model_validate(await request.json(), context={"bot": bot})
+    await dp.feed_update(bot, update)
+    return web.Response()
+
 async def main():
-    await bot.delete_webhook(drop_pending_updates=True)
-    await dp.start_polling(bot)
+    """Запускает aiohttp веб-сервер"""
+    app = web.Application()
+    app.router.post("/webhook", handle_webhook)
+    
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
+    
+    await on_startup()
+    print(f"🚀 Бот запущен в режиме webhook на порту {PORT}")
+    
+    # Бесконечно ждем
+    await asyncio.Event().wait()
 
 if __name__ == "__main__":
     asyncio.run(main())
