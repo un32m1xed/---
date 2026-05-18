@@ -9,30 +9,25 @@ from aiogram.types import Update
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiohttp import web
 import asyncio
-import uuid
-import requests
 
-# ===== НАСТРОЙКИ (ТВОИ ДАННЫЕ УЖЕ ВСТАВЛЕНЫ) =====
+# ===== НАСТРОЙКИ (ТВОИ ДАННЫЕ) =====
 TOKEN = "8925937134:AAG_xQQxj2GDUldtCRuR7ie0zGfImA6q6Pk"
 CHANNEL_ID = -1003745006151
 ADMIN_ID = 1584577191
-SHOP_ID = ""
-SECRET_KEY = ""
 
-# Прокси (рабочий SOCKS5 прокси, может потребоваться замена)
+# Прокси (если нужен)
 PROXY = "socks5://185.252.120.34:1080"
-# ================================================
+# =================================
 
-# --- НАСТРОЙКИ WEBHOOKА (НЕ ТРОГАЙ) ---
+# Настройки webhook
 PORT = int(os.environ.get('PORT', 10000))
-WEBHOOK_HOST = f"https://png-bot.onrender.com" # Твой URL на Render
+WEBHOOK_HOST = "https://png-bot.onrender.com"
 
-# --- СОЗДАНИЕ БОТА С ПРОКСИ ---
+# Создаём бота с прокси
 session = AiohttpSession(proxy=PROXY)
 bot = Bot(token=TOKEN, session=session)
 dp = Dispatcher()
 
-# --- ОСТАЛЬНАЯ ЧАСТЬ ТВОЕГО КОДА (ФУНКЦИИ) ---
 DB_FILE = "db.json"
 USERS_FILE = "users.json"
 
@@ -59,7 +54,6 @@ def save_users(users):
 db = load_db()
 users = load_users()
 user_state = {}
-pending_payments = {}
 
 DAILY_FREE_LIMIT = 20
 
@@ -142,37 +136,6 @@ def search_by_keywords(query):
             results.extend(msg_ids)
     return list(dict.fromkeys(results))
 
-def create_payment(amount=30, description="Премиум-доступ на месяц"):
-    idempotence_key = str(uuid.uuid4())
-    payment_data = {
-        "amount": {"value": f"{amount}.00", "currency": "RUB"},
-        "payment_method_data": {"type": "bank_card"},
-        "confirmation": {"type": "redirect", "return_url": "https://t.me"},
-        "description": description,
-        "capture": True
-    }
-    auth = (SHOP_ID, SECRET_KEY)
-    response = requests.post(
-        "https://api.yookassa.ru/v3/payments",
-        json=payment_data,
-        auth=auth,
-        headers={"Idempotence-Key": idempotence_key}
-    )
-    if response.status_code == 200:
-        data = response.json()
-        return data["confirmation"]["confirmation_url"], data["id"]
-    return None, None
-
-def check_payment_status(payment_id):
-    auth = (SHOP_ID, SECRET_KEY)
-    response = requests.get(
-        f"https://api.yookassa.ru/v3/payments/{payment_id}",
-        auth=auth
-    )
-    if response.status_code == 200:
-        return response.json().get("status")
-    return None
-
 @dp.message(Command("start"))
 async def start(message: types.Message):
     remaining = get_remaining_searches(message.from_user.id)
@@ -213,22 +176,10 @@ async def show_help(callback: types.CallbackQuery):
 
 @dp.callback_query(lambda c: c.data == "buy_premium")
 async def buy_premium(callback: types.CallbackQuery):
-    user_id = callback.from_user.id
-    
-    # Временное сообщение для теста (пока нет ЮKassa)
     await callback.message.answer(
-        "💎 **Премиум-доступ — 30₽/месяц**\n\n"
-        "Сейчас тестовый режим. Чтобы активировать премиум вручную, напиши админу.\n\n"
-        "После настройки ЮKassa здесь будет автоматическая оплата.",
-        parse_mode="Markdown"
+        "💎 Премиум — 30₽/месяц\n\nСкоро здесь будет автоматическая оплата через ЮKassa.\nПока напиши админу для активации."
     )
     await callback.answer()
-    
-    # Уведомление админу
-    await bot.send_message(
-        ADMIN_ID,
-        f"💰 Пользователь @{callback.from_user.username} (ID: {user_id}) хочет купить премиум!"
-    )
 
 @dp.message(Command("activate"))
 async def activate_subscription(message: types.Message):
@@ -298,18 +249,13 @@ async def search(message: types.Message):
     can_search, tier = can_user_search(user_id)
     
     if not can_search:
-        await message.answer(
-            f"❌ Лимит {DAILY_FREE_LIMIT} запросов на сегодня исчерпан.\n\n"
-            f"Листать найденное кнопками — бесплатно!\n\n"
-            f"💎 Купи премиум за 30₽/месяц — безлимит!\n"
-            f"Напиши /start и нажми «Купить премиум»"
-        )
+        await message.answer(f"❌ Лимит {DAILY_FREE_LIMIT} запросов на сегодня исчерпан.")
         return
     
     results = search_by_keywords(query)
     
     if not results:
-        await message.answer(f"❌ Ничего не найдено для «{query}»\n\nПопробуй другие слова.")
+        await message.answer(f"❌ Ничего не найдено для «{query}»")
         return
     
     increment_search(user_id)
@@ -357,14 +303,13 @@ async def handle_callback(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     action = callback.data
     
-    # Пропускаем специальные кнопки
     if action in ["help", "buy_premium", "none"]:
         await callback.answer()
         return
     
     state = user_state.get(user_id)
     if not state:
-        await callback.message.answer("🔍 Сначала напиши слово для поиска")
+        await callback.message.answer("🔍 Сначала напиши слово")
         await callback.answer()
         return
     
@@ -381,21 +326,18 @@ async def handle_callback(callback: types.CallbackQuery):
     await send_image(user_id, callback.message.chat.id)
     await callback.answer()
 
-# --- НОВАЯ ЧАСТЬ: ЗАПУСК В РЕЖИМЕ WEBHOOK ---
+# ЗАПУСК В РЕЖИМЕ WEBHOOK
 async def on_startup():
-    """Устанавливает webhook при запуске"""
     webhook_url = f"{WEBHOOK_HOST}/webhook"
     await bot.set_webhook(webhook_url)
-    print(f"✅ Webhook установлен на {webhook_url}")
+    print(f"Webhook установлен на {webhook_url}")
 
 async def handle_webhook(request):
-    """Обрабатывает входящие запросы от Telegram"""
     update = Update.model_validate(await request.json(), context={"bot": bot})
     await dp.feed_update(bot, update)
     return web.Response()
 
 async def main():
-    """Запускает aiohttp веб-сервер"""
     app = web.Application()
     app.router.post("/webhook", handle_webhook)
     
@@ -405,9 +347,8 @@ async def main():
     await site.start()
     
     await on_startup()
-    print(f"🚀 Бот запущен в режиме webhook на порту {PORT}")
+    print(f"Бот запущен на порту {PORT}")
     
-    # Бесконечно ждем
     await asyncio.Event().wait()
 
 if __name__ == "__main__":
