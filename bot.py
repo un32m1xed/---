@@ -132,19 +132,19 @@ async def start(message: types.Message):
         if expiry >= date.today():
             is_premium = True
     
-    status_text = "⭐ Premium - unlimited" if is_premium else f"🆓 Free - {remaining} of {DAILY_FREE_LIMIT} today"
+    status_text = "Premium - unlimited" if is_premium else f"Free - {remaining} of {DAILY_FREE_LIMIT} today"
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💎 Buy premium (30 RUB)", callback_data="buy_premium")],
-        [InlineKeyboardButton(text="📖 How to use", callback_data="help")]
+        [InlineKeyboardButton(text="Buy premium (30 RUB)", callback_data="buy_premium")],
+        [InlineKeyboardButton(text="How to use", callback_data="help")]
     ])
     
     await message.answer(
         f"Hello, {message.from_user.first_name}!\n\n"
         f"I search PNG without background. Send me a word or phrase.\n\n"
         f"{status_text}\n\n"
-        f"📌 One request = one image. Browsing is free!\n\n"
-        f"⬇️ Send your request",
+        f"One request = one image. Browsing is free!\n\n"
+        f"Send your request",
         reply_markup=keyboard
     )
 
@@ -258,11 +258,11 @@ async def send_image(user_id, chat_id):
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="◀️ Back", callback_data="prev"),
+            InlineKeyboardButton(text="Back", callback_data="prev"),
             InlineKeyboardButton(text=f"{state['index']+1}/{state['total']}", callback_data="none"),
-            InlineKeyboardButton(text="Next ▶️", callback_data="next")
+            InlineKeyboardButton(text="Next", callback_data="next")
         ],
-        [InlineKeyboardButton(text="💎 Buy premium", callback_data="buy_premium")]
+        [InlineKeyboardButton(text="Buy premium", callback_data="buy_premium")]
     ])
     
     try:
