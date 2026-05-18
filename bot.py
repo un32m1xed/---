@@ -15,6 +15,8 @@ CHANNEL_ID = -1003745006151
 ADMIN_ID = 1584577191
 SHOP_ID = ""
 SECRET_KEY = ""
+
+PROXY = "socks5://185.252.120.34:1080"
 # ======================================
 
 bot = Bot(token=TOKEN)
