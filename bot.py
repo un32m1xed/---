@@ -11,24 +11,25 @@ from aiogram.filters import Command
 from aiogram import F
 from aiogram.client.session.aiohttp import AiohttpSession
 
-# ==================== НАСТРОЙКИ (ЗАМЕНИ НА СВОИ) ====================
+# ==================== НАСТРОЙКИ (ВСЁ ВСТАВЛЕНО) ====================
 TOKEN = "8925937134:AAG_xQQxj2GDUldtCRuR7ie0zGfImA6q6Pk"
 CHANNEL_ID = -1003745006151
 ADMIN_ID = 1584577191
 
-# ЮKassa (вставь свои ключи, когда получишь)
-SHOP_ID = "1359471"          # Например "123456"
-SECRET_KEY = "live_hR54U-Pa1-vMIJh6bnQxzWxYrB6WXQ4PdjqAPfbaovo"       # Например "live_xxxxxxxx" или "test_xxxxxxxx"
+# ========== ТВОИ КЛЮЧИ ЮKASSA ==========
+SHOP_ID = "1359471"
+SECRET_KEY = "live_hR54U-Pa1-vMIJh6bnQxzWxYrB6WXQ4PdjqAPfbaovo"
+# ========================================
 
 # Прокси (оставь пустым, если не нужен)
-PROXY = ""  # Например "socks5://185.252.120.34:1080"
+PROXY = ""
 
 # Webhook настройки
 PORT = int(os.environ.get("PORT", 10000))
 WEBHOOK_HOST = "https://png-bot.onrender.com"
 # ===================================================================
 
-# Создаём сессию с прокси (если указан)
+# Создаём бота
 if PROXY:
     session = AiohttpSession(proxy=PROXY)
     bot = Bot(token=TOKEN, session=session)
@@ -37,7 +38,7 @@ else:
 
 dp = Dispatcher()
 
-# ==================== РАБОТА С БАЗАМИ ДАННЫХ ====================
+# ==================== БАЗЫ ДАННЫХ ====================
 DB_FILE = "db.json"
 USERS_FILE = "users.json"
 
@@ -49,7 +50,7 @@ def load_db():
 
 def save_db(db):
     with open(DB_FILE, "w") as f:
-        json.dump(db, f, indent=2)
+        json.dump(db, f, indent=2, ensure_ascii=False)
 
 def load_users():
     if os.path.exists(USERS_FILE):
@@ -59,7 +60,7 @@ def load_users():
 
 def save_users(users):
     with open(USERS_FILE, "w") as f:
-        json.dump(users, f, indent=2)
+        json.dump(users, f, indent=2, ensure_ascii=False)
 
 db = load_db()
 users = load_users()
@@ -68,7 +69,7 @@ pending_payments = {}
 
 DAILY_FREE_LIMIT = 20
 
-# ==================== ЛОГИКА ПОДПИСОК И ЛИМИТОВ ====================
+# ==================== ЛОГИКА ЛИМИТОВ ====================
 def can_user_search(user_id):
     today = date.today().isoformat()
     user_id_str = str(user_id)
@@ -139,7 +140,6 @@ def get_remaining_searches(user_id):
     used = user.get("searches_today", 0)
     return max(0, DAILY_FREE_LIMIT - used)
 
-# ==================== ПОИСК ПО КЛЮЧЕВЫМ СЛОВАМ ====================
 def search_by_keywords(query):
     query_words = set(query.lower().split())
     results = []
@@ -149,11 +149,8 @@ def search_by_keywords(query):
             results.extend(msg_ids)
     return list(dict.fromkeys(results))
 
-# ==================== ЮKassa (ПЛАТЕЖИ) ====================
-def create_payment(amount=30, description="Premium access for 30 days"):
-    if not SHOP_ID or not SECRET_KEY:
-        return None, None
-    
+# ==================== ЮKASSA (ПЛАТЕЖИ) ====================
+def create_payment(amount=30, description="Премиум-доступ на 30 дней"):
     idempotence_key = str(uuid.uuid4())
     payment_data = {
         "amount": {"value": f"{amount}.00", "currency": "RUB"},
@@ -175,9 +172,6 @@ def create_payment(amount=30, description="Premium access for 30 days"):
     return None, None
 
 def check_payment_status(payment_id):
-    if not SHOP_ID or not SECRET_KEY:
-        return None
-    
     auth = (SHOP_ID, SECRET_KEY)
     response = requests.get(
         f"https://api.yookassa.ru/v3/payments/{payment_id}",
@@ -187,7 +181,7 @@ def check_payment_status(payment_id):
         return response.json().get("status")
     return None
 
-# ==================== ОБРАБОТЧИКИ КОМАНД И КНОПОК ====================
+# ==================== КОМАНДЫ ====================
 @dp.message(Command("start"))
 async def start(message: types.Message):
     remaining = get_remaining_searches(message.from_user.id)
@@ -198,31 +192,31 @@ async def start(message: types.Message):
         if expiry >= date.today():
             is_premium = True
     
-    status_text = "⭐ Premium — unlimited" if is_premium else f"🆓 Free — {remaining} of {DAILY_FREE_LIMIT} today"
+    status_text = "⭐ Премиум — безлимит" if is_premium else f"🆓 Бесплатно — {remaining} из {DAILY_FREE_LIMIT} сегодня"
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💎 Buy premium (30 RUB)", callback_data="buy_premium")],
-        [InlineKeyboardButton(text="📖 How to use", callback_data="help")]
+        [InlineKeyboardButton(text="💎 Купить премиум (30₽)", callback_data="buy_premium")],
+        [InlineKeyboardButton(text="📖 Как пользоваться", callback_data="help")]
     ])
     
     await message.answer(
-        f"🐱 Hello, {message.from_user.first_name}!\n\n"
-        f"I search PNG without background. Send a word or phrase.\n\n"
+        f"🐱 Привет, {message.from_user.first_name}!\n\n"
+        f"Я ищу PNG без фона. Напиши слово или фразу.\n\n"
         f"{status_text}\n\n"
-        f"📌 One request = one image. Browsing is free!\n\n"
-        f"⬇️ Send your request",
+        f"📌 Один запрос = одна картинка. Листай кнопками бесплатно!\n\n"
+        f"⬇️ Напиши свой запрос",
         reply_markup=keyboard
     )
 
 @dp.callback_query(lambda c: c.data == "help")
 async def show_help(callback: types.CallbackQuery):
     await callback.message.answer(
-        "📖 **How to use:**\n\n"
-        "1️⃣ Send a word or phrase\n"
-        "2️⃣ Get the first image (costs 1 request)\n"
-        "3️⃣ Use Next/Back buttons to browse (free)\n\n"
-        f"💰 {DAILY_FREE_LIMIT} free requests per day\n"
-        "💎 Premium — 30 RUB/month, unlimited"
+        "📖 **Инструкция:**\n\n"
+        "1️⃣ Напиши слово или фразу (например, «кот», «еловый лес»)\n"
+        "2️⃣ Получишь первую картинку (снимает 1 запрос)\n"
+        "3️⃣ Кнопки Вперёд/Назад — бесплатно\n\n"
+        f"💰 {DAILY_FREE_LIMIT} запросов бесплатно в день\n"
+        "💎 Премиум — 30₽/месяц, безлимит"
     )
     await callback.answer()
 
@@ -230,31 +224,29 @@ async def show_help(callback: types.CallbackQuery):
 async def buy_premium(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     
-    if SHOP_ID and SECRET_KEY:
-        payment_url, payment_id = create_payment()
-        
-        if payment_url and payment_id:
-            pending_payments[user_id] = payment_id
-            
-            keyboard = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="💳 Pay 30 RUB", url=payment_url)],
-                [InlineKeyboardButton(text="✅ Check payment", callback_data="check_payment")]
-            ])
-            
-            await callback.message.answer(
-                "💎 **Premium — 30 RUB/month**\n\n"
-                "Click the button to pay by card or SBP.\n"
-                "After payment, click 'Check payment' to activate.",
-                reply_markup=keyboard
-            )
-            await callback.answer()
-            return
+    payment_url, payment_id = create_payment()
     
-    # Заглушка, если нет ключей ЮKassa
+    if not payment_url or not payment_id:
+        await callback.message.answer(
+            "❌ Ошибка создания платежа. Попробуйте позже.\n\n"
+            "Если ошибка повторяется, напишите админу."
+        )
+        await callback.answer()
+        return
+    
+    pending_payments[user_id] = payment_id
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💳 Оплатить 30₽", url=payment_url)],
+        [InlineKeyboardButton(text="✅ Проверить оплату", callback_data="check_payment")]
+    ])
+    
     await callback.message.answer(
-        "💎 Premium — 30 RUB/month\n\n"
-        "Payment system is being configured.\n"
-        "Contact @admin to activate manually."
+        "💎 **Премиум-доступ — 30₽/месяц**\n\n"
+        "Нажмите кнопку, оплатите картой или СБП.\n"
+        "После оплаты нажмите «Проверить оплату» — премиум включится.",
+        reply_markup=keyboard,
+        parse_mode="Markdown"
     )
     await callback.answer()
 
@@ -263,7 +255,7 @@ async def check_payment(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     
     if user_id not in pending_payments:
-        await callback.message.answer("No active payments. Use /start to buy premium.")
+        await callback.message.answer("❌ Нет активных платежей. Начните с /start")
         await callback.answer()
         return
     
@@ -277,24 +269,27 @@ async def check_payment(callback: types.CallbackQuery):
         save_users(users)
         del pending_payments[user_id]
         
-        await callback.message.answer("🎉 Premium activated! Unlimited access for 30 days.")
-        await bot.send_message(ADMIN_ID, f"✅ Payment received from @{callback.from_user.username} (ID: {user_id})")
+        await callback.message.answer("🎉 Премиум активирован! Безлимит на 30 дней.")
+        await bot.send_message(
+            ADMIN_ID,
+            f"✅ Оплата получена! Пользователь @{callback.from_user.username} (ID: {user_id}) купил премиум"
+        )
     elif status in ["pending", "waiting_for_capture"]:
-        await callback.message.answer("⏳ Payment not completed yet. Try again in a minute.")
+        await callback.message.answer("⏳ Оплата ещё не прошла. Попробуйте через минуту.")
     else:
-        await callback.message.answer("❌ Payment not found. Try again.")
+        await callback.message.answer("❌ Оплата не найдена или отменена. Попробуйте снова.")
     
     await callback.answer()
 
 @dp.message(Command("activate"))
 async def activate_subscription(message: types.Message):
     if message.from_user.id != ADMIN_ID:
-        await message.answer("⛔ No permission")
+        await message.answer("⛔ Нет прав")
         return
     
     parts = message.text.split()
     if len(parts) != 2:
-        await message.answer("Usage: /activate USER_ID")
+        await message.answer("Использование: /activate USER_ID")
         return
     
     user_id = parts[1]
@@ -306,10 +301,10 @@ async def activate_subscription(message: types.Message):
     users[user_id]["subscription_until"] = expiry_date
     save_users(users)
     
-    await message.answer(f"✅ Subscription activated for {user_id} until {expiry_date}")
+    await message.answer(f"✅ Подписка активирована для {user_id} до {expiry_date}")
     
     try:
-        await bot.send_message(int(user_id), "🎉 Premium activated by admin!")
+        await bot.send_message(int(user_id), "🎉 Премиум активирован вручную админом.")
     except:
         pass
 
@@ -321,10 +316,10 @@ async def check_status(message: types.Message):
     if user.get("subscription_until"):
         expiry = datetime.fromisoformat(user["subscription_until"]).date()
         if expiry >= date.today():
-            await message.answer(f"⭐ Premium until {expiry}")
+            await message.answer(f"⭐ Премиум до {expiry}")
             return
     
-    await message.answer(f"🆓 Free: {remaining} requests left today")
+    await message.answer(f"🆓 Сегодня осталось запросов: {remaining} из {DAILY_FREE_LIMIT}")
 
 @dp.channel_post()
 async def on_channel_post(message: types.Message):
@@ -333,7 +328,7 @@ async def on_channel_post(message: types.Message):
         caption = message.caption or ""
         
         if not caption.strip():
-            await message.reply("⚠️ Error: add caption to file")
+            await message.reply("⚠️ Ошибка: добавь подпись к файлу")
             return
         
         keyword = caption.strip().lower()
@@ -344,7 +339,7 @@ async def on_channel_post(message: types.Message):
             db[keyword].append(msg_id)
         
         save_db(db)
-        await message.reply(f"✅ Saved: '{keyword}'")
+        await message.reply(f"✅ Сохранено: «{keyword}»")
 
 @dp.message(F.text)
 async def search(message: types.Message):
@@ -355,16 +350,16 @@ async def search(message: types.Message):
     
     if not can_search:
         await message.answer(
-            f"❌ Daily limit ({DAILY_FREE_LIMIT}) reached.\n\n"
-            f"💎 Buy premium for unlimited access!\n"
-            f"Send /start and click 'Buy premium'"
+            f"❌ Лимит {DAILY_FREE_LIMIT} запросов на сегодня исчерпан.\n\n"
+            f"💎 Купи премиум за 30₽/месяц — безлимит!\n"
+            f"Напиши /start и нажми «Купить премиум»"
         )
         return
     
     results = search_by_keywords(query)
     
     if not results:
-        await message.answer(f"❌ Nothing found for '{query}'\n\nTry other words.")
+        await message.answer(f"❌ Ничего не найдено для «{query}»\n\nПопробуй другие слова.")
         return
     
     increment_search(user_id)
@@ -377,8 +372,8 @@ async def search(message: types.Message):
         "results": results
     }
     
-    limit_text = f"Requests left: {remaining}" if tier == "free" else "Premium — unlimited"
-    await message.answer(f"🔍 Found {len(results)} images\n{limit_text}")
+    limit_text = f"Осталось запросов: {remaining}" if tier == "free" else "Премиум — безлимит"
+    await message.answer(f"🔍 Найдено {len(results)} картинок\n{limit_text}")
     await send_image(user_id, message.chat.id)
 
 async def send_image(user_id, chat_id):
@@ -390,11 +385,11 @@ async def send_image(user_id, chat_id):
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
-            InlineKeyboardButton(text="◀️ Back", callback_data="prev"),
+            InlineKeyboardButton(text="◀️ Назад", callback_data="prev"),
             InlineKeyboardButton(text=f"{state['index']+1}/{state['total']}", callback_data="none"),
-            InlineKeyboardButton(text="Next ▶️", callback_data="next")
+            InlineKeyboardButton(text="Вперёд ▶️", callback_data="next")
         ],
-        [InlineKeyboardButton(text="💎 Buy premium", callback_data="buy_premium")]
+        [InlineKeyboardButton(text="💎 Купить премиум", callback_data="buy_premium")]
     ])
     
     try:
@@ -405,7 +400,7 @@ async def send_image(user_id, chat_id):
             reply_markup=keyboard
         )
     except Exception as e:
-        await bot.send_message(chat_id, f"Error: {e}")
+        await bot.send_message(chat_id, f"Ошибка: {e}")
 
 @dp.callback_query()
 async def handle_callback(callback: types.CallbackQuery):
@@ -418,7 +413,7 @@ async def handle_callback(callback: types.CallbackQuery):
     
     state = user_state.get(user_id)
     if not state:
-        await callback.message.answer("🔍 Send a word first")
+        await callback.message.answer("🔍 Сначала напиши слово для поиска")
         await callback.answer()
         return
     
@@ -439,7 +434,7 @@ async def handle_callback(callback: types.CallbackQuery):
 async def on_startup():
     webhook_url = f"{WEBHOOK_HOST}/webhook"
     await bot.set_webhook(webhook_url)
-    print(f"✅ Webhook set to {webhook_url}")
+    print(f"✅ Webhook установлен на {webhook_url}")
 
 async def handle_webhook(request):
     update = Update.model_validate(await request.json(), context={"bot": bot})
@@ -456,7 +451,7 @@ async def main():
     await site.start()
     
     await on_startup()
-    print(f"🚀 Bot started on port {PORT}")
+    print(f"🚀 Бот запущен на порту {PORT}")
     
     await asyncio.Event().wait()
 
