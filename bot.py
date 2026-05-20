@@ -18,7 +18,7 @@ ADMIN_ID = 1584577191
 
 # ЮKassa (вставь свои ключи, когда получишь)
 SHOP_ID = "1359471"          # Например "123456"
-SECRET_KEY = "972107021800"       # Например "live_xxxxxxxx" или "test_xxxxxxxx"
+SECRET_KEY = "live_hR54U-Pa1-vMIJh6bnQxzWxYrB6WXQ4PdjqAPfbaovo"       # Например "live_xxxxxxxx" или "test_xxxxxxxx"
 
 # Прокси (оставь пустым, если не нужен)
 PROXY = ""  # Например "socks5://185.252.120.34:1080"
